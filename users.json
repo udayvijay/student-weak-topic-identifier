@@ -1,0 +1,42 @@
+[
+  {
+    "email": "hrisheekeshprogamer@gmail.com",
+    "password": "1234"
+  },
+  {
+    "name": "Ammu",
+    "email": "ammu@example.com",
+    "password": "1234",
+    "created_at": "2026-04-11T18:08:58.862941"
+  },
+  {
+    "name": "ammu1",
+    "email": "ammu@gmail.com",
+    "password": "1234",
+    "created_at": "2026-04-11T18:10:26.906098"
+  },
+  {
+    "name": "Newuser",
+    "email": "new@gmail.com",
+    "password": "12345",
+    "created_at": "2026-04-11T18:23:22.723440"
+  },
+  {
+    "name": "newuser",
+    "email": "rishi@gmail.com",
+    "password": "12345",
+    "created_at": "2026-04-11T18:35:24.433767"
+  },
+  {
+    "name": "newuser12",
+    "email": "newuser12@gmail.com",
+    "password": "12345",
+    "created_at": "2026-04-11T18:45:10.365321"
+  },
+  {
+    "name": "tanmay",
+    "email": "choco@gmail.com",
+    "password": "1234",
+    "created_at": "2026-04-13T09:43:31.015767"
+  }
+]

@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EduScan — AI Weak Topic Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #171c2e;
+    --border: rgba(255,255,255,0.07);
+    --accent: #5c6fff;
+    --accent2: #ff6b6b;
+    --accent3: #00e5a0;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --warn: #fbbf24;
+    --radius: 14px;
+    --tab-active: #5c6fff;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ---- BG GRID ---- */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(92,111,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(92,111,255,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ---- AUTH SCREEN ---- */
+  #auth-screen {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    background: var(--bg);
+  }
+
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 48px 40px;
+    width: 100%; max-width: 420px;
+    position: relative;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    animation: slideUp 0.5s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .auth-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px; font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .auth-logo span { color: var(--accent); }
+
+  .auth-subtitle { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+
+  .auth-tabs { display: flex; gap: 4px; margin-bottom: 28px; background: var(--surface2); border-radius: 10px; padding: 4px; }
+  .auth-tab {
+    flex: 1; padding: 9px; border: none; background: transparent;
+    color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 14px;
+    border-radius: 8px; cursor: pointer; transition: all 0.2s;
+  }
+  .auth-tab.active { background: var(--accent); color: #fff; font-weight: 500; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .field input {
+    width: 100%; padding: 12px 14px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 14px;
+    outline: none; transition: border 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+
+  .btn-primary {
+    width: 100%; padding: 13px;
+    background: var(--accent); color: #fff;
+    border: none; border-radius: 10px;
+    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    margin-top: 4px;
+  }
+  .btn-primary:hover { background: #4a5ae8; transform: translateY(-1px); }
+
+  .auth-msg { margin-top: 12px; font-size: 13px; text-align: center; min-height: 18px; }
+  .auth-msg.error { color: var(--accent2); }
+  .auth-msg.success { color: var(--accent3); }
+
+  /* ---- MAIN APP ---- */
+  #app { display: none; min-height: 100vh; position: relative; z-index: 1; }
+
+  /* TOP NAV */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 36px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,13,20,0.85);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .nav-logo {
+    font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .nav-logo span { color: var(--accent); }
+
+  .nav-user { display: flex; align-items: center; gap: 14px; }
+  .nav-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px;
+  }
+  .nav-email { font-size: 13px; color: var(--muted); }
+
+  .btn-logout {
+    padding: 7px 16px; background: transparent;
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--muted); font-size: 13px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-logout:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* MAIN TABS */
+  .main-tabs {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 36px;
+    background: var(--surface);
+  }
+  .main-tab {
+    padding: 16px 24px; border: none; background: transparent;
+    font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600;
+    color: var(--muted); cursor: pointer; position: relative;
+    transition: color 0.2s; border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .main-tab .tab-icon { margin-right: 8px; }
+  .main-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .main-tab:hover:not(.active) { color: var(--text); }
+
+  /* PAGE CONTENT */
+  .page { display: none; padding: 36px; animation: fadeIn 0.3s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .page-title {
+    font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800;
+    letter-spacing: -0.5px; margin-bottom: 4px;
+  }
+  .page-sub { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+
+  /* ---- DASHBOARD ---- */
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .stat-card.blue::before { background: var(--accent); }
+  .stat-card.red::before  { background: var(--accent2); }
+  .stat-card.green::before{ background: var(--accent3); }
+
+  .stat-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; }
+  .stat-value.blue  { color: var(--accent); }
+  .stat-value.red   { color: var(--accent2); }
+  .stat-value.green { color: var(--accent3); }
+  .stat-desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .welcome-banner {
+    background: linear-gradient(135deg, rgba(92,111,255,0.15), rgba(167,139,250,0.08));
+    border: 1px solid rgba(92,111,255,0.25);
+    border-radius: var(--radius); padding: 28px 32px;
+    margin-bottom: 24px;
+  }
+  .welcome-banner h2 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .welcome-banner p { color: var(--muted); font-size: 14px; }
+  .btn-start {
+    display: inline-block; margin-top: 16px;
+    padding: 10px 22px; background: var(--accent);
+    color: #fff; border: none; border-radius: 8px;
+    font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-start:hover { background: #4a5ae8; }
+
+  /* ---- EXAM ---- */
+  .subject-selector { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+  .subj-btn {
+    padding: 10px 22px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted);
+    border-radius: 50px; cursor: pointer; font-size: 14px;
+    transition: all 0.2s;
+  }
+  .subj-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(92,111,255,0.1); }
+
+  .quiz-wrap { max-width: 720px; }
+  .quiz-progress-bar {
+    height: 4px; background: var(--surface2); border-radius: 4px;
+    margin-bottom: 28px; overflow: hidden;
+  }
+  .quiz-progress-fill { height: 100%; background: var(--accent); transition: width 0.3s; border-radius: 4px; }
+
+  .q-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px; margin-bottom: 16px;
+  }
+  .q-meta { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .q-num { font-size: 12px; color: var(--muted); }
+  .q-topic {
+    font-size: 11px; padding: 3px 10px;
+    background: rgba(92,111,255,0.15); color: var(--accent);
+    border-radius: 50px; font-weight: 500;
+  }
+  .q-text { font-size: 16px; font-weight: 500; margin-bottom: 18px; line-height: 1.5; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option-btn {
+    padding: 12px 16px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+    text-align: left; cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .option-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(92,111,255,0.08); }
+  .option-btn.correct { border-color: var(--accent3); background: rgba(0,229,160,0.1); color: var(--accent3); }
+  .option-btn.wrong   { border-color: var(--accent2); background: rgba(255,107,107,0.1); color: var(--accent2); }
+  .option-btn:disabled { cursor: default; }
+
+  .option-letter {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: var(--bg); display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+
+  .quiz-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; }
+  .btn-sec {
+    padding: 11px 24px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-size: 14px; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-sec:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-submit {
+    padding: 11px 28px; background: var(--accent3);
+    border: none; border-radius: 10px; color: #0a0d14;
+    font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-submit:hover { filter: brightness(1.1); }
+
+  /* ---- WEAK TOPICS ---- */
+  .weak-empty {
+    text-align: center; padding: 80px 20px; color: var(--muted);
+  }
+  .weak-empty .icon { font-size: 48px; margin-bottom: 16px; }
+  .weak-empty p { font-size: 15px; }
+
+  .weak-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .weak-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 22px;
+    border-left: 3px solid var(--accent2);
+    transition: transform 0.2s;
+  }
+  .weak-card:hover { transform: translateY(-2px); }
+  .weak-subj {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--accent2); margin-bottom: 8px;
+  }
+  .weak-topic { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .weak-score { font-size: 12px; color: var(--muted); }
+  .score-bar { height: 4px; background: var(--surface2); border-radius: 4px; margin-top: 12px; }
+  .score-fill { height: 100%; border-radius: 4px; background: var(--accent2); }
+
+  /* ---- AI SUGGESTIONS ---- */
+  .ai-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+  }
+  .ai-badge {
+    padding: 5px 14px; border-radius: 50px;
+    background: linear-gradient(135deg, #5c6fff, #a78bfa);
+    font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+  }
+
+  .suggestion-list { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+  .suggestion-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 22px 24px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .suggestion-icon {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .suggestion-icon.blue   { background: rgba(92,111,255,0.15); }
+  .suggestion-icon.green  { background: rgba(0,229,160,0.12); }
+  .suggestion-icon.yellow { background: rgba(251,191,36,0.12); }
+
+  .suggestion-text { flex: 1; }
+  .suggestion-title { font-weight: 600; font-size: 15px; margin-bottom: 5px; }
+  .suggestion-body  { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+  .ai-loading {
+    display: flex; align-items: center; gap: 10px;
+    color: var(--muted); font-size: 14px; padding: 20px 0;
+  }
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .no-results {
+    text-align: center; padding: 60px; color: var(--muted);
+  }
+
+  /* ---- RESULT MODAL ---- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; backdrop-filter: blur(4px);
+    display: none;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 40px; max-width: 500px; width: 90%;
+    animation: slideUp 0.3s ease;
+    text-align: center;
+  }
+  .modal-emoji { font-size: 56px; margin-bottom: 16px; }
+  .modal-title { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+  .modal-sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .score-ring {
+    width: 110px; height: 110px; border-radius: 50%;
+    background: conic-gradient(var(--accent3) var(--pct, 70%), var(--surface2) 0);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 24px;
+    position: relative;
+  }
+  .score-ring::after {
+    content: ''; position: absolute;
+    width: 82px; height: 82px; border-radius: 50%;
+    background: var(--surface);
+  }
+  .score-ring-text {
+    position: relative; z-index: 1;
+    font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+    color: var(--accent3);
+  }
+  .modal-btn {
+    padding: 12px 32px; background: var(--accent);
+    color: #fff; border: none; border-radius: 10px;
+    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .modal-btn:hover { background: #4a5ae8; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .nav { padding: 14px 18px; }
+    .page { padding: 20px 18px; }
+    .main-tabs { padding: 0 18px; overflow-x: auto; }
+    .main-tab { padding: 14px 16px; white-space: nowrap; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== AUTH ========== -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">Study<span>Pulse</span></div>
+    <div class="auth-subtitle">AI-Powered Weak Topic Analyzer</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuth('login')">Sign In</button>
+      <button class="auth-tab" onclick="switchAuth('signup')">Sign Up</button>
+    </div>
+
+    <div id="login-form">
+      <div class="field"><label>Email</label><input id="l-email" type="email" placeholder="you@example.com" /></div>
+      <div class="field"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••" /></div>
+      <button class="btn-primary" onclick="doLogin()">Sign In</button>
+    </div>
+
+    <div id="signup-form" style="display:none">
+      <div class="field"><label>Name</label><input id="s-name" type="text" placeholder="Your Name" /></div>
+      <div class="field"><label>Email</label><input id="s-email" type="email" placeholder="you@example.com" /></div>
+      <div class="field"><label>Password</label><input id="s-pass" type="password" placeholder="Create password" /></div>
+      <button class="btn-primary" onclick="doSignup()">Create Account</button>
+    </div>
+
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
+
+<!-- ========== MAIN APP ========== -->
+<div id="app">
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-logo">Study<span>Pulse</span></div>
+    <div class="nav-user">
+      <div class="nav-avatar" id="nav-avatar">U</div>
+      <span class="nav-email" id="nav-email"></span>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- TABS -->
+  <div class="main-tabs">
+    <button class="main-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+      <span class="tab-icon">🏠</span>Dashboard
+    </button>
+    <button class="main-tab" data-tab="exam" onclick="switchTab('exam')">
+      <span class="tab-icon">📝</span>Take Exam
+    </button>
+    <button class="main-tab" data-tab="weak" onclick="switchTab('weak')">
+      <span class="tab-icon">⚠️</span>Weak Topics
+    </button>
+    <button class="main-tab" data-tab="ai" onclick="switchTab('ai')">
+      <span class="tab-icon">🤖</span>AI Suggestions
+    </button>
+  </div>
+
+  <!-- DASHBOARD PAGE -->
+  <div class="page active" id="page-dashboard">
+    <div class="welcome-banner">
+      <h2>Welcome back, <span id="welcome-name">Student</span>! 👋</h2>
+      <p>Track your weak areas and improve with personalized AI suggestions.</p>
+      <button class="btn-start" onclick="switchTab('exam')">Start a New Exam →</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card blue">
+        <div class="stat-label">Exams Taken</div>
+        <div class="stat-value blue" id="stat-exams">0</div>
+        <div class="stat-desc">Total attempts</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Weak Topics</div>
+        <div class="stat-value red" id="stat-weak">0</div>
+        <div class="stat-desc">Needs improvement</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Best Subject</div>
+        <div class="stat-value green" id="stat-best" style="font-size:20px;margin-top:8px">—</div>
+        <div class="stat-desc">Highest performance</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXAM PAGE -->
+  <div class="page" id="page-exam">
+    <div class="page-title">Take an Exam</div>
+    <div class="page-sub">Select a subject and answer MCQ questions to identify weak areas.</div>
+
+    <div id="exam-select-screen">
+      <div class="subject-selector">
+        <button class="subj-btn active" data-subj="Mathematics" onclick="selectSubject(this)">📐 Mathematics</button>
+        <button class="subj-btn" data-subj="Physics" onclick="selectSubject(this)">⚛️ Physics</button>
+        <button class="subj-btn" data-subj="Chemistry" onclick="selectSubject(this)">🧪 Chemistry</button>
+      </div>
+      <button class="btn-primary" style="max-width:220px" onclick="startExam()">Start Exam →</button>
+    </div>
+
+    <div id="exam-quiz-screen" style="display:none">
+      <div class="quiz-wrap">
+        <div class="quiz-progress-bar">
+          <div class="quiz-progress-fill" id="quiz-progress"></div>
+        </div>
+        <div id="questions-container"></div>
+        <div class="quiz-nav">
+          <div style="font-size:13px;color:var(--muted)" id="q-counter"></div>
+          <div style="display:flex;gap:10px">
+            <button class="btn-sec" id="btn-prev" onclick="prevQ()">← Prev</button>
+            <button class="btn-sec" id="btn-next" onclick="nextQ()">Next →</button>
+            <button class="btn-submit" id="btn-submit" onclick="submitExam()" style="display:none">Submit Exam ✓</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEAK TOPICS PAGE -->
+  <div class="page" id="page-weak">
+    <div class="page-title">Weak Topics</div>
+    <div class="page-sub">Topics where you scored below threshold — focus here to improve.</div>
+    <div id="weak-content">
+      <div class="weak-empty">
+        <div class="icon">📊</div>
+        <p>No data yet. Take an exam to see your weak topics.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI SUGGESTIONS PAGE -->
+  <div class="page" id="page-ai">
+    <div class="page-title">AI Suggestions</div>
+    <div class="page-sub">Personalized improvement plan powered by Claude AI.</div>
+    <div id="ai-content">
+      <div class="no-results">
+        <p style="color:var(--muted)">Complete an exam first to get AI-powered suggestions.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div class="modal-overlay" id="result-modal">
+  <div class="modal">
+    <div class="modal-emoji" id="modal-emoji">🎉</div>
+    <div class="modal-title" id="modal-title">Exam Complete!</div>
+    <div class="modal-sub" id="modal-sub">Here's your performance summary</div>
+    <div class="score-ring" id="score-ring">
+      <span class="score-ring-text" id="score-text">0%</span>
+    </div>
+    <div id="modal-details" style="color:var(--muted);font-size:13px;margin-bottom:24px"></div>
+    <button class="modal-btn" onclick="closeModal()">View Analysis →</button>
+  </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:5000';
+let currentUser = null;
+let allResults = [];
+let selectedSubject = 'Mathematics';
+let currentQ = 0;
+let userAnswers = {};
+let quizQuestions = [];
+let answeredMap = {};
+
+// ===== QUESTION BANK =====
+const questionBank = {
+  Mathematics: [
+    { topic: 'Algebra', q: 'Solve: 2x + 5 = 13', opts: ['x = 3', 'x = 4', 'x = 9', 'x = 5'], ans: 1 },
+    { topic: 'Algebra', q: 'If f(x) = 3x² - 2x + 1, find f(2)', opts: ['9', '11', '13', '5'], ans: 1 },
+    { topic: 'Geometry', q: 'Area of a circle with radius 7 (use π ≈ 3.14)', opts: ['43.96', '153.86', '49', '21.98'], ans: 1 },
+    { topic: 'Geometry', q: 'Sum of interior angles of a hexagon', opts: ['540°', '720°', '600°', '360°'], ans: 1 },
+    { topic: 'Trigonometry', q: 'Value of sin(90°)', opts: ['0', '1', '√2/2', '0.5'], ans: 1 },
+    { topic: 'Trigonometry', q: 'cos(60°) = ?', opts: ['√3/2', '0.5', '1', '0'], ans: 1 },
+    { topic: 'Calculus', q: 'd/dx (x³) = ?', opts: ['x²', '3x', '3x²', '2x³'], ans: 2 },
+    { topic: 'Calculus', q: '∫ 2x dx = ?', opts: ['2x²', 'x²', 'x² + C', '2x + C'], ans: 2 },
+    { topic: 'Statistics', q: 'Mean of 2, 4, 6, 8, 10', opts: ['5', '6', '7', '8'], ans: 1 },
+    { topic: 'Statistics', q: 'Median of 3, 7, 1, 9, 5', opts: ['5', '7', '3', '1'], ans: 0 },
+  ],
+  Physics: [
+    { topic: 'Mechanics', q: 'Newton\'s 2nd law: F = ?', opts: ['m/a', 'ma', 'm+a', 'm²a'], ans: 1 },
+    { topic: 'Mechanics', q: 'Unit of force in SI', opts: ['Joule', 'Newton', 'Pascal', 'Watt'], ans: 1 },
+    { topic: 'Optics', q: 'Speed of light in vacuum (approx.)', opts: ['3×10⁸ m/s', '3×10⁶ m/s', '3×10¹⁰ m/s', '3×10⁴ m/s'], ans: 0 },
+    { topic: 'Optics', q: 'Phenomenon responsible for rainbow formation', opts: ['Reflection', 'Diffraction', 'Dispersion', 'Refraction'], ans: 2 },
+    { topic: 'Thermodynamics', q: '0°C equals how many Kelvin?', opts: ['100K', '273K', '373K', '0K'], ans: 1 },
+    { topic: 'Thermodynamics', q: 'First law of thermodynamics relates to conservation of?', opts: ['Mass', 'Momentum', 'Energy', 'Charge'], ans: 2 },
+    { topic: 'Electricity', q: 'Ohm\'s law: V = ?', opts: ['I/R', 'IR', 'I+R', 'R/I'], ans: 1 },
+    { topic: 'Electricity', q: 'Unit of electric resistance', opts: ['Ampere', 'Volt', 'Ohm', 'Coulomb'], ans: 2 },
+    { topic: 'Waves', q: 'Frequency × Wavelength = ?', opts: ['Amplitude', 'Speed', 'Period', 'Energy'], ans: 1 },
+    { topic: 'Waves', q: 'Sound cannot travel through?', opts: ['Water', 'Steel', 'Vacuum', 'Air'], ans: 2 },
+  ],
+  Chemistry: [
+    { topic: 'Atomic Structure', q: 'Atomic number of Carbon', opts: ['6', '12', '8', '4'], ans: 0 },
+    { topic: 'Atomic Structure', q: 'Particles in the nucleus of an atom', opts: ['Electrons & Protons', 'Protons & Neutrons', 'Neutrons & Electrons', 'Only Protons'], ans: 1 },
+    { topic: 'Chemical Bonding', q: 'NaCl bond type', opts: ['Covalent', 'Metallic', 'Ionic', 'Hydrogen'], ans: 2 },
+    { topic: 'Chemical Bonding', q: 'H₂O forms which type of bond between molecules?', opts: ['Ionic', 'Covalent', 'Hydrogen bond', 'Metallic'], ans: 2 },
+    { topic: 'Periodic Table', q: 'Most electronegative element', opts: ['Oxygen', 'Fluorine', 'Chlorine', 'Nitrogen'], ans: 1 },
+    { topic: 'Periodic Table', q: 'Noble gases belong to which group?', opts: ['Group 1', 'Group 17', 'Group 18', 'Group 2'], ans: 2 },
+    { topic: 'Organic Chemistry', q: 'Simplest hydrocarbon', opts: ['Ethane', 'Methane', 'Propane', 'Butane'], ans: 1 },
+    { topic: 'Organic Chemistry', q: 'Functional group of alcohols', opts: ['-COOH', '-CHO', '-OH', '-NH₂'], ans: 2 },
+    { topic: 'Acids & Bases', q: 'pH of pure water at 25°C', opts: ['0', '7', '14', '5'], ans: 1 },
+    { topic: 'Acids & Bases', q: 'Which is a strong acid?', opts: ['Acetic acid', 'Citric acid', 'Hydrochloric acid', 'Carbonic acid'], ans: 2 },
+  ]
+};
+
+// ===== AUTH =====
+function switchAuth(mode) {
+  document.querySelectorAll('.auth-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && mode === 'login') || (i === 1 && mode === 'signup'));
+  });
+  document.getElementById('login-form').style.display = mode === 'login' ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('auth-msg').textContent = '';
+}
+
+function showMsg(msg, type='error') {
+  const el = document.getElementById('auth-msg');
+  el.textContent = msg;
+  el.className = 'auth-msg ' + type;
+}
+
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const pass  = document.getElementById('l-pass').value;
+  if (!email || !pass) { showMsg('Fill all fields'); return; }
+
+  try {
+    const r = await fetch(`${API}/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass })
+    });
+    const d = await r.json();
+    if (!r.ok) { showMsg(d.msg); return; }
+    loginSuccess(email);
+  } catch {
+    // Fallback: local storage login for demo
+    const users = JSON.parse(localStorage.getItem('eduscan_users') || '[]');
+    const user = users.find(u => u.email === email && u.password === pass);
+    if (user) loginSuccess(email);
+    else showMsg('Invalid credentials. (Backend offline — using local mode)');
+  }
+}
+
+async function doSignup() {
+  const name  = document.getElementById('s-name').value.trim();
+  const email = document.getElementById('s-email').value.trim();
+  const pass  = document.getElementById('s-pass').value;
+  if (!name || !email || !pass) { showMsg('Fill all fields'); return; }
+
+  try {
+    const r = await fetch(`${API}/signup`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ name, email, password: pass })
+    });
+    const d = await r.json();
+    if (!r.ok) { showMsg(d.msg); return; }
+    showMsg('Account created! Sign in now.', 'success');
+    switchAuth('login');
+  } catch {
+    // Local fallback
+    const users = JSON.parse(localStorage.getItem('eduscan_users') || '[]');
+    if (users.find(u => u.email === email)) { showMsg('User already exists'); return; }
+    users.push({ name, email, password: pass });
+    localStorage.setItem('eduscan_users', JSON.stringify(users));
+    showMsg('Account created! Sign in now.', 'success');
+    switchAuth('login');
+  }
+}
+
+function loginSuccess(email) {
+  currentUser = email;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  // Get name
+  const users = JSON.parse(localStorage.getItem('eduscan_users') || '[]');
+  const user = users.find(u => u.email === email);
+  const name = user ? user.name : email.split('@')[0];
+  document.getElementById('nav-email').textContent = email;
+  document.getElementById('nav-avatar').textContent = name[0].toUpperCase();
+  document.getElementById('welcome-name').textContent = name;
+  loadResults();
+}
+
+function logout() {
+  currentUser = null; allResults = [];
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+// ===== TABS =====
+function switchTab(tab) {
+  document.querySelectorAll('.main-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+  if (tab === 'exam') resetExamUI();
+}
+
+// ===== RESULTS =====
+async function loadResults() {
+  try {
+    const r = await fetch(`${API}/results/${encodeURIComponent(currentUser)}`);
+    allResults = await r.json();
+  } catch {
+    allResults = JSON.parse(localStorage.getItem('eduscan_results_' + currentUser) || '[]');
+  }
+  updateDashboard();
+  renderWeakTopics();
+}
+
+function saveResultLocal(record) {
+  allResults.push(record);
+  localStorage.setItem('eduscan_results_' + currentUser, JSON.stringify(allResults));
+}
+
+function updateDashboard() {
+  document.getElementById('stat-exams').textContent = allResults.length;
+  const allWeak = allResults.flatMap(r => r.weak_topics || []);
+  document.getElementById('stat-weak').textContent = allWeak.length;
+
+  // Best subject
+  const subjectScores = {};
+  allResults.forEach(r => {
+    if (r.subject_scores) {
+      Object.entries(r.subject_scores).forEach(([s, sc]) => {
+        if (!subjectScores[s]) subjectScores[s] = [];
+        subjectScores[s].push(sc);
+      });
+    }
+  });
+  if (Object.keys(subjectScores).length) {
+    const best = Object.entries(subjectScores).sort((a, b) => {
+      const avgA = a[1].reduce((s,v)=>s+v,0)/a[1].length;
+      const avgB = b[1].reduce((s,v)=>s+v,0)/b[1].length;
+      return avgB - avgA;
+    })[0][0];
+    document.getElementById('stat-best').textContent = best;
+  }
+}
+
+// ===== EXAM =====
+function selectSubject(btn) {
+  document.querySelectorAll('.subj-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedSubject = btn.dataset.subj;
+}
+
+function startExam() {
+  quizQuestions = [...questionBank[selectedSubject]];
+  quizQuestions = quizQuestions.sort(() => Math.random() - 0.5);
+  currentQ = 0; userAnswers = {}; answeredMap = {};
+  document.getElementById('exam-select-screen').style.display = 'none';
+  document.getElementById('exam-quiz-screen').style.display = 'block';
+  renderQuestion();
+}
+
+function resetExamUI() {
+  document.getElementById('exam-select-screen').style.display = 'block';
+  document.getElementById('exam-quiz-screen').style.display = 'none';
+}
+
+function renderQuestion() {
+  const q = quizQuestions[currentQ];
+  const total = quizQuestions.length;
+  document.getElementById('quiz-progress').style.width = ((currentQ + 1) / total * 100) + '%';
+  document.getElementById('q-counter').textContent = `Question ${currentQ + 1} of ${total}`;
+
+  const answered = answeredMap[currentQ];
+  const letters = ['A','B','C','D'];
+
+  document.getElementById('questions-container').innerHTML = `
+    <div class="q-card">
+      <div class="q-meta">
+        <span class="q-num">Q${currentQ + 1}</span>
+        <span class="q-topic">${q.topic}</span>
+      </div>
+      <div class="q-text">${q.q}</div>
+      <div class="options">
+        ${q.opts.map((o, i) => {
+          let cls = '';
+          if (answered !== undefined) {
+            if (i === q.ans) cls = 'correct';
+            else if (i === answered && i !== q.ans) cls = 'wrong';
+          }
+          return `<button class="option-btn ${cls}" ${answered !== undefined ? 'disabled' : ''}
+            onclick="selectAnswer(${i})">
+            <span class="option-letter">${letters[i]}</span>${o}
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  document.getElementById('btn-prev').style.visibility = currentQ === 0 ? 'hidden' : 'visible';
+  const isLast = currentQ === total - 1;
+  const allAnswered = Object.keys(answeredMap).length === total;
+  document.getElementById('btn-next').style.display = isLast ? 'none' : 'inline-block';
+  document.getElementById('btn-submit').style.display = isLast ? 'inline-block' : 'none';
+}
+
+function selectAnswer(idx) {
+  if (answeredMap[currentQ] !== undefined) return;
+  answeredMap[currentQ] = idx;
+  userAnswers[currentQ] = idx;
+  renderQuestion();
+}
+
+function nextQ() { if (currentQ < quizQuestions.length - 1) { currentQ++; renderQuestion(); } }
+function prevQ() { if (currentQ > 0) { currentQ--; renderQuestion(); } }
+
+async function submitExam() {
+  // Calculate scores per topic
+  const topicScores = {};
+  quizQuestions.forEach((q, i) => {
+    if (!topicScores[q.topic]) topicScores[q.topic] = { correct: 0, total: 0 };
+    topicScores[q.topic].total++;
+    if (answeredMap[i] === q.ans) topicScores[q.topic].correct++;
+  });
+
+  const totalCorrect = Object.values(topicScores).reduce((s, t) => s + t.correct, 0);
+  const totalQ = quizQuestions.length;
+  const pct = Math.round(totalCorrect / totalQ * 100);
+
+  const weakTopics = Object.entries(topicScores)
+    .filter(([_, s]) => s.correct / s.total < 0.6)
+    .map(([topic, s]) => ({ subject: selectedSubject, topic, score: s.correct, total: s.total }));
+
+  const record = {
+    user: currentUser,
+    subject: selectedSubject,
+    score: pct,
+    weak_topics: weakTopics,
+    topic_scores: topicScores,
+    subject_scores: { [selectedSubject]: pct },
+    timestamp: new Date().toISOString()
+  };
+
+  // Submit to backend
+  try {
+    await fetch(`${API}/submit`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ user: currentUser, answers: { [selectedSubject]: Object.fromEntries(Object.entries(topicScores).map(([t, s]) => [t, s.correct])) }})
+    });
+  } catch {}
+  saveResultLocal(record);
+  updateDashboard();
+  renderWeakTopics();
+
+  // Show modal
+  showResultModal(pct, totalCorrect, totalQ, weakTopics.length);
+
+  // Generate AI suggestions
+  generateAISuggestions(weakTopics, selectedSubject, topicScores);
+}
+
+function showResultModal(pct, correct, total, weakCount) {
+  const emoji = pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '📚';
+  const title = pct >= 80 ? 'Excellent!' : pct >= 60 ? 'Good Job!' : 'Keep Practicing!';
+  document.getElementById('modal-emoji').textContent = emoji;
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-sub').textContent = `You answered ${correct} out of ${total} correctly`;
+  document.getElementById('score-text').textContent = pct + '%';
+  document.getElementById('score-ring').style.setProperty('--pct', pct + '%');
+  document.getElementById('modal-details').innerHTML = weakCount
+    ? `<span style="color:var(--accent2)">⚠ ${weakCount} weak topic${weakCount > 1 ? 's' : ''} identified</span>`
+    : `<span style="color:var(--accent3)">✓ No weak topics — excellent mastery!</span>`;
+  document.getElementById('result-modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('result-modal').classList.remove('show');
+  switchTab('weak');
+}
+
+// ===== WEAK TOPICS =====
+function renderWeakTopics() {
+  const allWeak = allResults.flatMap(r => r.weak_topics || []);
+  // Deduplicate by subject+topic, keep latest
+  const seen = {};
+  allWeak.forEach(w => { seen[w.subject + '__' + w.topic] = w; });
+  const unique = Object.values(seen);
+
+  if (!unique.length) {
+    document.getElementById('weak-content').innerHTML = `
+      <div class="weak-empty"><div class="icon">📊</div><p>No weak topics found yet. Take an exam!</p></div>`;
+    return;
+  }
+
+  document.getElementById('weak-content').innerHTML = `
+    <div class="weak-grid">
+      ${unique.map(w => {
+        const pct = w.score !== undefined ? Math.round(w.score / (w.total || 1) * 100) : 0;
+        return `<div class="weak-card">
+          <div class="weak-subj">${w.subject}</div>
+          <div class="weak-topic">${w.topic}</div>
+          <div class="weak-score">${w.score ?? '?'}/${w.total ?? '?'} correct (${pct}%)</div>
+          <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ===== AI SUGGESTIONS =====
+async function generateAISuggestions(weakTopics, subject, topicScores) {
+  const aiContent = document.getElementById('ai-content');
+  if (!weakTopics.length) {
+    aiContent.innerHTML = `<div class="suggestion-card">
+      <div class="suggestion-icon green">🎯</div>
+      <div class="suggestion-text">
+        <div class="suggestion-title">Outstanding Performance!</div>
+        <div class="suggestion-body">You have no weak topics in ${subject}. Consider challenging yourself with harder practice sets or move to the next level.</div>
+      </div></div>`;
+    return;
+  }
+
+  aiContent.innerHTML = `<div class="ai-loading"><div class="spinner"></div>Generating AI analysis…</div>`;
+
+  const weakList = weakTopics.map(w => `${w.topic} (${w.score}/${w.total} correct)`).join(', ');
+  const allTopics = Object.entries(topicScores).map(([t, s]) => `${t}: ${s.correct}/${s.total}`).join(', ');
+
+  const prompt = `A student just took a ${subject} exam. Topic-wise results: ${allTopics}. 
+Weak topics (below 60%): ${weakList}.
+
+Generate 4 specific, actionable, encouraging study suggestions to help them improve. 
+For each suggestion, respond ONLY with valid JSON array (no markdown, no explanation):
+[
+  {"icon": "📘", "title": "...", "body": "..."},
+  {"icon": "🔁", "title": "...", "body": "..."},
+  {"icon": "🧠", "title": "...", "body": "..."},
+  {"icon": "⏱", "title": "...", "body": "..."}
+]`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.map(c => c.text || '').join('') || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const suggestions = JSON.parse(clean);
+    renderSuggestions(suggestions, weakTopics, subject);
+  } catch {
+    // Fallback suggestions
+    const fallback = weakTopics.flatMap(w => [
+      { icon: '📘', title: `Review ${w.topic} Fundamentals`, body: `Start by revisiting core concepts in ${w.topic}. Use your textbook chapters and summarize key formulas or rules.` },
+      { icon: '🔁', title: `Practice ${w.topic} Questions Daily`, body: `Solve at least 10 MCQs on ${w.topic} each day to build fluency and pattern recognition.` },
+    ]).slice(0, 4);
+    renderSuggestions(fallback, weakTopics, subject);
+  }
+}
+
+function renderSuggestions(suggestions, weakTopics, subject) {
+  const colors = ['blue', 'green', 'yellow', 'blue'];
+  const aiContent = document.getElementById('ai-content');
+  aiContent.innerHTML = `
+    <div class="ai-header">
+      <div class="page-title" style="margin-bottom:0;font-size:18px">Your Study Plan for ${subject}</div>
+      <span class="ai-badge">✦ AI Generated</span>
+    </div>
+    <div style="color:var(--muted);font-size:13px;margin-bottom:20px">
+      Based on ${weakTopics.length} weak topic${weakTopics.length > 1 ? 's' : ''}: 
+      <strong style="color:var(--accent2)">${weakTopics.map(w => w.topic).join(', ')}</strong>
+    </div>
+    <div class="suggestion-list">
+      ${suggestions.map((s, i) => `
+        <div class="suggestion-card" style="animation-delay:${i*0.1}s">
+          <div class="suggestion-icon ${colors[i % colors.length]}">${s.icon}</div>
+          <div class="suggestion-text">
+            <div class="suggestion-title">${s.title}</div>
+            <div class="suggestion-body">${s.body}</div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+</script>
+</body>
+</html>
